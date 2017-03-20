@@ -22,25 +22,31 @@ MLP_OPTIONS = [
 def make_mlps(ob_space, ac_space, cfg):
     assert isinstance(ob_space, Box)
     hid_sizes = cfg["hid_sizes"]
+
     if isinstance(ac_space, Box):
         outdim = ac_space.shape[0]
         probtype = DiagGauss(outdim)
     elif isinstance(ac_space, Discrete):
         outdim = ac_space.n
         probtype = Categorical(outdim)
+
     net = Sequential()
     for (i, layeroutsize) in enumerate(hid_sizes):
         inshp = dict(input_shape=ob_space.shape) if i==0 else {}
         net.add(Dense(layeroutsize, activation=cfg["activation"], **inshp))
+
     if isinstance(ac_space, Box):
         net.add(Dense(outdim))
-        Wlast = net.layers[-1].W
-        backend.set_value(Wlast, backend.get_value(Wlast)*0.1)
+        Wlast = net.layers[-1].get_weights()
+        Wlast[0] = Wlast[0]*0.1
+        net.layers[-1].set_weights(Wlast)
         net.add(ConcatFixedStd())
     else:
         net.add(Dense(outdim, activation="softmax"))
-        Wlast = net.layers[-1].W
-        backend.set_value(Wlast, backend.get_value(Wlast)*0.1)
+        Wlast = net.layers[-1].get_weights()
+        Wlast[0] = Wlast[0]*0.1
+        net.layers[-1].set_weights(Wlast)
+
     policy = StochPolicyKeras(net, probtype)
     vfnet = Sequential()
     for (i, layeroutsize) in enumerate(hid_sizes):
